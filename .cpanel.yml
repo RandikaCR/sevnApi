@@ -1,0 +1,5 @@
+---
+deployment:
+  tasks:
+    - export DEPLOYPATH=/home/idealmar/public_html/api.sevn.lk/
+    - /bin/cp -R images $DEPLOYPATH
