@@ -18,9 +18,35 @@ class User extends Authenticatable
      * @var list<string>
      */
     protected $fillable = [
-        'name',
+        'ref_id',
+        'public_key',
+        'user_role_id',
+        'first_name',
+        'last_name',
         'email',
         'password',
+        'phone',
+        'whatsapp',
+        'image',
+        'is_email_subscribed',
+        'is_phone_subscribed',
+        'is_whatsapp_subscribed',
+        'profit_margin_on_sale',
+        'user_code',
+        'is_discount_available',
+        'discount_rule_id',
+        'default_business_id',
+        'default_business_branch_id',
+        'registered_business_id',
+        'registered_business_branch_id',
+        'registered_by',
+        'last_activity_time',
+        'last_order_time',
+        'status',
+        'is_deleted',
+        'deleted_by',
+        'deleted_at',
+        'created_by',
     ];
 
     /**
