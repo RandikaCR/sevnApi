@@ -15,14 +15,14 @@ use App\Validator\APIValidator;
 
 class UsersController extends Controller
 {
-    private $screen = 'users';
+    private $screenPrefix = 'users';
 
     public function getUsers(Request $request){
 
         $out = [];
 
         $validate = [
-            'screen' => $this->screen,
+            'screen' => $this->screenPrefix,
             'allowed_user_roles' => [1, 2],
             'allowed_permissions' => ['is_view' => 1],
         ];
@@ -102,7 +102,7 @@ class UsersController extends Controller
         $out = [];
 
         $validate = [
-            'screen' => $this->screen,
+            'screen' => $this->screenPrefix,
             'allowed_user_roles' => [1, 2],
             'allowed_permissions' => ['is_view' => 1],
         ];
@@ -114,11 +114,11 @@ class UsersController extends Controller
 
 
         if (empty($isInvalid)){
-            $request->screen = $this->screen;
+            $request->screen = $this->screenPrefix;
             $request->user_id = $this->userId;
 
             $req = [
-                'screen' => $this->screen,
+                'screen' => $this->screenPrefix,
                 'user_id' => $this->userId,
                 'ref_id' => $request->ref_id,
                 'dealer_id' => $request->dealer_id,
@@ -182,7 +182,7 @@ class UsersController extends Controller
         if (empty($request->ref_id) && empty($user->ref_id)){
             $dealerId = !empty($request->dealer_id) ? $request->dealer_id : 1;
             $getCommon = new CommonHelper();
-            $refId = $getCommon->generateRefId($dealerId, $this->screen, $user->id);
+            $refId = $getCommon->generateRefId($dealerId, $this->screenPrefix, $user->id);
             $tuser = User::find($user->id);
             $tuser->ref_id = $refId;
             $tuser->save();
@@ -419,7 +419,7 @@ class UsersController extends Controller
         $out = [];
 
         $validate = [
-            'screen' => $this->screen,
+            'screen' => $this->screenPrefix,
             'allowed_user_roles' => [1, 2],
             'allowed_permissions' => ['is_view' => 1],
         ];
