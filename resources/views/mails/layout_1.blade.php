@@ -7,7 +7,7 @@
                         <td class="content-wrap" style="font-family: 'Roboto', sans-serif; box-sizing: border-box; color: #495057; font-size: 14px; vertical-align: top; margin: 0;box-shadow: 0 3px 15px rgba(30,32,37,.06); ;border-radius: 7px; background-color: #fff;overflow: hidden;" valign="top">
                             <meta itemprop="name" content="Confirm Email" style="font-family: 'Roboto', sans-serif; box-sizing: border-box; font-size: 14px; margin: 0;" />
                             <div style="padding: 20px;box-sizing: border-box; text-align: center; background: #000000;">
-                                <img src="{{ businessAssetPath('/common/images/logo-white.png') }}" alt="" height="25">
+                                <img src="{{ businessAssetPath('/common/images/mail-logo-white.png') }}" alt="" height="25">
                             </div>
 
                             @yield('content')

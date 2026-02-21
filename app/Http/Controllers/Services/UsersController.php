@@ -6,6 +6,7 @@ use App\Helpers\CommonHelper;
 use App\Helpers\DBHelper;
 use App\Helpers\UsersHelper;
 use App\Http\Controllers\Controller;
+use App\Mail\testMail;
 use App\Models\Designations;
 use App\Models\User;
 use App\Models\UserApplicationSettings;
@@ -16,6 +17,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Validation\Rules;
 use App\Validator\APIValidator;
 
@@ -104,6 +106,12 @@ class UsersController extends Controller
     }
 
     public function getUser(Request $request){
+
+        $mailData = [
+            'email_subject' => 'you have received a contact request from the Funeral Officiants Authority FOA Ltd.',
+        ];
+
+        //$send = Mail::to('cralwis@gmail.com')->send(new testMail($mailData));
 
         $out = [];
 
