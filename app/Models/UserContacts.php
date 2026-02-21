@@ -12,4 +12,9 @@ class UserContacts extends Model
     const UPDATED_AT = 'updated_at';
 
     protected $table = 'user_contacts';
+
+    public function user_contact_bank_account_details()
+    {
+        return $this->hasMany(UserContactBankAccountDetails::class, 'user_contact_id', 'id');
+    }
 }

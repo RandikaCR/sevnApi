@@ -4,8 +4,14 @@ namespace App\Http\Controllers\Services;
 
 use App\Helpers\CommonHelper;
 use App\Helpers\DBHelper;
+use App\Helpers\UsersHelper;
 use App\Http\Controllers\Controller;
+use App\Models\Designations;
 use App\Models\User;
+use App\Models\UserApplicationSettings;
+use App\Models\UserBusinessBranches;
+use App\Models\UserBusinesses;
+use App\Models\UserRoles;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -50,14 +56,14 @@ class UsersController extends Controller
                 'dealers.dealer AS default_dealer'
             )
                 ->join('user_roles', 'users.user_role_id', 'user_roles.id')
-                ->leftJoin('dealers', 'users.switched_dealer_id', 'dealers.id')
+                ->leftJoin('dealers', 'users.switched_business_id', 'dealers.id')
                 ->when(!empty($keyword), function ($query) use ($keyword) {
                     return $query->where(DB::raw(DBHelper::dbConcat('users', 'first_name','users', 'last_name')), 'like', '%' . $keyword . '%')
                         ->orWhere('users.public_key', 'like', '%' . $keyword . '%')
                         ->orWhere('users.email', 'like', '%' . $keyword . '%');
                 })
                 ->when(!empty($userId), function ($query) use ($userId) {
-                    return $query->where('users.ref_id', $userId);
+                    return $query->where('users.uuid', $userId);
                 })
                 ->when(!empty($publicKey), function ($query) use ($publicKey) {
                     return $query->where('users.public_key', $publicKey);
@@ -78,7 +84,7 @@ class UsersController extends Controller
                             'dealers.dealer',
                             'dealers.motordat_id',
                         )
-                            ->join('dealers', 'user_dealers.dealer_id', 'dealers.id')
+                            ->join('dealers', 'user_dealers.business_id', 'dealers.id')
                             ->where('dealers.status', 1);
                     },
                     'user_screens' => function ($query) use ($request){
@@ -103,7 +109,7 @@ class UsersController extends Controller
 
         $validate = [
             'screen' => $this->screenPrefix,
-            'allowed_user_roles' => [1, 2],
+            'allowed_user_roles' => [2],
             'allowed_permissions' => ['is_view' => 1],
         ];
 
@@ -114,21 +120,17 @@ class UsersController extends Controller
 
 
         if (empty($isInvalid)){
-            $request->screen = $this->screenPrefix;
-            $request->user_id = $this->userId;
 
             $req = [
                 'screen' => $this->screenPrefix,
-                'user_id' => $this->userId,
-                'ref_id' => $request->ref_id,
-                'dealer_id' => $request->dealer_id,
+                'user_id' => $request->user_id,
             ];
 
-            /*$user = new UsersHelper();
+            $user = new UsersHelper();
             $user = $user->getUser($req);
             if (!empty($user)){
                 $out = $user;
-            }*/
+            }
         }
 
 
@@ -145,11 +147,17 @@ class UsersController extends Controller
             'last_name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'string', 'lowercase', 'email', 'max:255', 'unique:'.User::class],
             'password' => ['required', 'confirmed', Rules\Password::defaults()],
+            'registered_business_id' => ['required'],
+            'registered_business_branch_id' => ['required'],
         ]);
+
+        $as = new CommonHelper();
+        $applicationSetting = $as->getApplicationSettings();
+
 
         $isNewUser = 0;
         if (!empty($request->user_id)){
-            $user = User::where('ref_id', $request->user_id)->first();
+            $user = User::where('uuid', $request->user_id)->first();
         }else{
 
             $isNewUser = 1;
@@ -159,15 +167,15 @@ class UsersController extends Controller
             $user->is_deleted = 0;
             $user->status = 1;
             $user->email = $request->email;
-            $user->site_layout_mode = 'light';
-            $user->site_topbar = 'dark';
-            $user->side_sidebar = 'dark';
+            $user->registered_business_id = $request->registered_business_id;
+            $user->registered_business_branch_id = $request->registered_business_branch_id;
+            $user->registered_by = !empty($this->userId) ? $this->userId : 0;
         }
 
         $user->first_name = $request->first_name;
         $user->last_name = $request->last_name;
+        $user->image  = !empty($request->image) ? $request->image : 'default-user.png';
         $user->user_role_id  = !empty($request->user_role_id) ? $request->user_role_id : 3;
-
         $user->save();
 
         //Set Public Key
@@ -179,13 +187,74 @@ class UsersController extends Controller
             $keyUser->save();
         }
 
-        if (empty($request->ref_id) && empty($user->ref_id)){
-            $dealerId = !empty($request->dealer_id) ? $request->dealer_id : 1;
+        if (empty($request->uuid) && empty($user->uuid)){
+            $businessId = !empty($request->registered_business_id) ? $request->registered_business_id : 1;
+
+            // Set Default User Business
+            $getUuIdRes = [
+                'business_id' => $request->registered_business_id,
+                'screen' => 'user_businesses',
+                'id' => 0,
+            ];
             $getCommon = new CommonHelper();
-            $refId = $getCommon->generateRefId($dealerId, $this->screenPrefix, $user->id);
-            $tuser = User::find($user->id);
-            $tuser->ref_id = $refId;
-            $tuser->save();
+            $uuId = $getCommon->generateUUId($getUuIdRes);
+
+            $ub = new UserBusinesses();
+            $ub->uuid = $uuId;
+            $ub->user_id = $user->id;
+            $ub->business_id = $request->registered_business_id;
+            $ub->status = 1;
+            $ub->save();
+
+            // Set Default User Business Branch
+            $getUuIdRes = [
+                'business_id' => $request->registered_business_id,
+                'screen' => 'user_business_branches',
+                'id' => 0,
+            ];
+            $getCommon = new CommonHelper();
+            $uuId = $getCommon->generateUUId($getUuIdRes);
+
+            $ubb = new UserBusinessBranches();
+            $ubb->uuid = $uuId;
+            $ubb->user_id = $user->id;
+            $ubb->business_branch_id = $request->registered_business_branch_id;
+            $ubb->status = 1;
+            $ubb->save();
+
+            // Set Default User Application Settings
+            $getUuIdRes = [
+                'business_id' => $ub->id,
+                'screen' => 'user_application_settings',
+                'id' => 0,
+            ];
+            $getCommon = new CommonHelper();
+            $uuId = $getCommon->generateUUId($getUuIdRes);
+
+            $uas = new UserApplicationSettings();
+            $uas->uuid = $uuId;
+            $uas->user_id = $user->id;
+            $uas->business_id = $businessId;
+            $uas->theme_layout_mode = !empty($applicationSetting->theme_layout_mode) ? $applicationSetting->theme_layout_mode : 'light';
+            $uas->theme_topbar = !empty($applicationSetting->theme_topbar) ? $applicationSetting->theme_topbar : 'dark';
+            $uas->theme_sidebar = !empty($applicationSetting->theme_sidebar) ? $applicationSetting->theme_sidebar : 'dark';
+            $uas->status = 1;
+            $uas->save();
+
+            // Update User Info
+            $getUuIdRes = [
+                'business_id' => $businessId,
+                'screen' => $this->screenPrefix,
+                'id' => $user->id,
+            ];
+
+            $getCommon = new CommonHelper();
+            $uuId = $getCommon->generateUUId($getUuIdRes);
+            $tUser = User::find($user->id);
+            $tUser->uuid = $uuId;
+            $tUser->default_business_id = $ub->id;
+            $tUser->default_business_branch_id = $ubb->id;
+            $tUser->save();
         }
 
         $getUser = User::find($user->id);
@@ -209,7 +278,7 @@ class UsersController extends Controller
                 'last_name' => ['required', 'string', 'max:255'],
             ]);
 
-            $user = User::where('ref_id', $request->ref_id)->first();
+            $user = User::where('uuid', $request->uuid)->first();
 
             $user->first_name = $request->first_name;
             $user->last_name = $request->last_name;
@@ -221,7 +290,7 @@ class UsersController extends Controller
         }
         elseif (!empty($mode) && $mode == 'settings'){
 
-            $user = User::where('ref_id', $request->ref_id)->first();
+            $user = User::where('uuid', $request->uuid)->first();
 
             $user->site_layout_mode = !empty($request->site_layout_mode) ? $request->site_layout_mode : 'light';
             $user->site_topbar = !empty($request->site_topbar) ? $request->site_topbar : 'dark';
@@ -238,7 +307,7 @@ class UsersController extends Controller
                 'password' => ['required', 'confirmed', Rules\Password::defaults()],
             ]);
 
-            $user = User::where('ref_id', $request->ref_id)->first();
+            $user = User::where('uuid', $request->uuid)->first();
 
             if (Hash::check($request->password_current, $user->password)) {
 
@@ -263,7 +332,7 @@ class UsersController extends Controller
 
         /*$isNewUser = 0;
         if (!empty($request->user_id)){
-            $user = User::where('ref_id', $request->user_id)->first();
+            $user = User::where('uuid', $request->user_id)->first();
         }else{
 
             $isNewUser = 1;
@@ -353,11 +422,11 @@ class UsersController extends Controller
                     'motordat_id' => null,
                 ];
 
-                if(!empty($user->switched_dealer_id)){
-                    $dealer = Dealers::find($user->switched_dealer_id);
+                if(!empty($user->switched_business_id)){
+                    $dealer = Dealers::find($user->switched_business_id);
                 }
 
-                $req = ['user_id' => $user->ref_id];
+                $req = ['user_id' => $user->uuid];
 
                 $dh = new DealersHelper();
                 $dealers = $dh->getUserDealers($req);
@@ -367,13 +436,13 @@ class UsersController extends Controller
                     $out = [
                         'status' => 'success',
                         'message' => '',
-                        'id' => $user->ref_id,
+                        'id' => $user->uuid,
                         'user_role_id' => $user->user_role_id,
                         'first_name' => $user->first_name,
                         'last_name' => $user->last_name,
                         'email' => $user->email,
                         'token' => $user->public_key,
-                        'switched_dealer_id' => $user->switched_dealer_id,
+                        'switched_business_id' => $user->switched_business_id,
                         'switched_dealer' => $dealer->dealer,
                         'dealer_motordat_id' => $dealer->motordat_id,
                         'site_layout_mode' => $user->site_layout_mode,
@@ -435,8 +504,8 @@ class UsersController extends Controller
             $currentPage = !empty($request->current_page) ? $request->current_page : 0;
 
             $keyword = !empty($request->keyword) ? $request->keyword : '';
-            $userId = !empty($request->ref_id) ? $request->ref_id : 0;
-            $dealerId = !empty($request->dealer_id) ? $request->dealer_id : 0;
+            $userId = !empty($request->uuid) ? $request->uuid : 0;
+            $dealerId = !empty($request->business_id) ? $request->business_id : 0;
             $status = !empty($request->status) ? $request->status : 1;
 
 
@@ -444,11 +513,11 @@ class UsersController extends Controller
                 'user_dealers.*',
                 'dealers.dealer',
             )
-                ->join('dealers', 'user_dealers.dealer_id', 'dealers.id')
+                ->join('dealers', 'user_dealers.business_id', 'dealers.id')
                 ->join('users', 'user_dealers.user_id', 'users.id')
-                ->where('users.ref_id', $userId)
+                ->where('users.uuid', $userId)
                 ->when(!empty($dealerId), function ($query) use ($dealerId) {
-                    return $query->where('dealers.ref_id', $dealerId);
+                    return $query->where('dealers.uuid', $dealerId);
                 })
                 ->when(!empty($keyword), function ($query) use ($keyword) {
                     return $query->where('dealers.dealer', 'like', '%' . $keyword . '%');
@@ -471,7 +540,7 @@ class UsersController extends Controller
             'allowed_permissions' => ['is_view' => 1, 'is_create' => 1, 'is_update' => 1],
         ];
 
-        /*$userDealer = UserDealers::where('ref_id', $request->user_dealer_id)->first();
+        /*$userDealer = UserDealers::where('uuid', $request->user_business_id)->first();
         $gs = $this->commonSwitchStatus($userDealer->status);
         $out['text'] = $gs['text'];
         $out['class'] = $gs['class'];

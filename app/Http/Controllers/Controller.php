@@ -6,14 +6,16 @@ use App\Helpers\CommonHelper;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Http\Request;
 use App\Helpers\UsersHelper;
+use Illuminate\Support\Facades\Http;
 
 
 abstract class Controller
 {
 
     public $userId = 0;
-    public $defaultDealerId = 0;
-    public $defaultDealerMotrodatId = 0;
+    public $userRoleId = 0;
+    public $defaultBusinessId = 0;
+    public $defaultBusinessBranchId = 0;
 
     public $isSuperAdmin = 0;
     public $isAdmin = 0;
@@ -22,16 +24,15 @@ abstract class Controller
     public $defaultItemsPerPage = 20;
 
     public function __construct(Request $request){
-        /*if(!empty($request->bearerToken())){
+        if(!empty($request->bearerToken())){
             $token = $request->bearerToken();
 
             $user = new UsersHelper();
             $user = $user->getUserByPublicKey($token);
 
             $this->userId = $user->id;
-            $this->defaultDealerId = $user->switched_dealer_id;
-            $this->defaultDealerMotrodatId = $user->motordat_id;
-
+            $this->defaultBusinessId = $user->default_business_id;
+            $this->defaultBusinessBranchId = $user->default_business_branch_id;
 
             if(!empty($user->user_role_id)){
                 if($user->user_role_id == 1){
@@ -44,7 +45,7 @@ abstract class Controller
                     $this->isModerator = 1;
                 }
             }
-        }*/
+        }
     }
 
 
@@ -62,12 +63,15 @@ abstract class Controller
             $isUserRestricted = 0;
         }
 
+        $allowedUserRoles = [1];
+        $allowedUserRoles = !empty($req['allowed_user_roles']) ? $allowedUserRoles[] = $req['allowed_user_roles'] : $allowedUserRoles;
+
         $request = [
             'screen' => $req['screen'],
             'user_id' => !empty($req['user_id']) ? $req['user_id'] : $this->userId,
-            'dealer_id' => !empty($req['dealer_id']) ? $req['dealer_id'] : $this->defaultDealerId,
-            'motordat_id' => !empty($req['motordat_id']) ? $req['motordat_id'] : $this->defaultDealerMotrodatId,
-            'allowed_user_roles' => !empty($req['allowed_user_roles']) ? $req['allowed_user_roles'] : [],
+            'business_id' => !empty($req['business_id']) ? $req['business_id'] : $this->defaultBusinessId,
+            'business_branch_id' => !empty($req['business_branch_id']) ? $req['business_branch_id'] : $this->defaultBusinessBranchId,
+            'allowed_user_roles' => $allowedUserRoles,
             'allowed_permissions' => !empty($req['allowed_permissions']) ? $req['allowed_permissions'] : [],
         ];
 
