@@ -111,7 +111,7 @@ class UsersController extends Controller
             'email_subject' => 'you have received a contact request from the Funeral Officiants Authority FOA Ltd.',
         ];
 
-        $send = Mail::to('cralwis@gmail.com')->send(new testMail($mailData));
+        //$send = Mail::to('cralwis@gmail.com')->send(new testMail($mailData));
 
         $out = [];
 
