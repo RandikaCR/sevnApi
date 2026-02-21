@@ -107,6 +107,8 @@ class UsersController extends Controller
 
     public function getUser(Request $request){
 
+        //return response()->json(['message' => 'Your email address is not verified.'], 403);
+
         $mailData = [
             'email_subject' => 'you have received a contact request from the Funeral Officiants Authority FOA Ltd.',
         ];
