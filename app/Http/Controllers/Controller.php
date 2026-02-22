@@ -49,7 +49,7 @@ abstract class Controller
     }
 
 
-    public function dbCurrentTime(){
+    public function dbInsertTime(){
         return date('Y-m-d H:i:s', time());
     }
 

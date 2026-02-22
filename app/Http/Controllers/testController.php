@@ -15,10 +15,10 @@ class testController extends Controller
         ];
 
 
-        /*return view('Mails.test', ['data' => $mailData]);
-        exit();*/
+        return view('mails.account-verify', ['data' => $mailData]);
+        exit();
 
-        $send = Mail::to('randika@motordat.com')->send(new testMail($mailData));
+        $send = Mail::to('cralwis@gmail.com')->send(new testMail($mailData));
 
         dd($send);
     }

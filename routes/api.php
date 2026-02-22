@@ -10,8 +10,7 @@ use App\Http\Controllers\Services\UserRolesController;
 
 // Common Routes
 Route::post('/Users/setUser', [UsersController::class, 'setUser'])->name('users.setUser');
-
-
+Route::post('/Users/verifyUserAccountByEmail', [UsersController::class, 'verifyUserAccountByEmail'])->name('users.verifyUserAccountByEmail');
 
 
 

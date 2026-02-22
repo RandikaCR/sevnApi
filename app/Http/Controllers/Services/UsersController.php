@@ -6,6 +6,7 @@ use App\Helpers\CommonHelper;
 use App\Helpers\DBHelper;
 use App\Helpers\UsersHelper;
 use App\Http\Controllers\Controller;
+use App\Mail\accountVerify;
 use App\Mail\testMail;
 use App\Models\Designations;
 use App\Models\User;
@@ -13,6 +14,7 @@ use App\Models\UserApplicationSettings;
 use App\Models\UserBusinessBranches;
 use App\Models\UserBusinesses;
 use App\Models\UserRoles;
+use Illuminate\Auth\Events\Registered;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -106,14 +108,6 @@ class UsersController extends Controller
     }
 
     public function getUser(Request $request){
-
-        //return response()->json(['message' => 'Your email address is not verified.'], 403);
-
-        $mailData = [
-            'email_subject' => 'you have received a contact request from the Funeral Officiants Authority FOA Ltd.',
-        ];
-
-        //$send = Mail::to('cralwis@gmail.com')->send(new testMail($mailData));
 
         $out = [];
 
@@ -268,6 +262,14 @@ class UsersController extends Controller
         }
 
         $getUser = User::find($user->id);
+
+        //event(new Registered($user));
+        $mailData = [
+            'email_subject' => 'Thank you for registering with SEVN. Please verify your account.',
+            'url' => $this->accountVerifyUrlGenerator($getUser->default_business_id, $getUser->uuid),
+        ];
+        $send = Mail::to($getUser->email)->send(new accountVerify($mailData));
+
 
         return response()->json($getUser);
     }
@@ -492,6 +494,39 @@ class UsersController extends Controller
         ]);
     }
 
+    public function verifyUserAccountByEmail(Request $request)
+    {
+        $status = 'error';
+        $message = '';
+
+        $userId = $request->user_id;
+        $expires = $request->expires;
+        $hash = $request->hash;
+        $signature = $request->signature;
+
+        $user = User::find($userId);
+        if (!empty($user)){
+            if (empty($user->created_at)){
+                if ( $expires > time() ) {
+                    $user->email_verified_at = $this->dbInsertTime();
+                    $user->save();
+                    $status = 'success';
+                    $message = 'Account has been activated successfully.';
+                }else{
+                    $message = 'Account activation link has expired.';
+                }
+            }else{
+                $message = 'Account already has been activated.';
+            }
+        }
+
+
+        return response()->json([
+            "status" => $status,
+            "message" => $message,
+        ]);
+    }
+
 
     public function getUserDealers(Request $request){
 
@@ -588,5 +623,9 @@ class UsersController extends Controller
         return response()->json($out);
     }
 
-
+    private function accountVerifyUrlGenerator($businessId, $uuid){
+        $timestamp = strtotime(date('Y-m-d H:i:s', strtotime('+1 hour')));
+        $url = businessUrlWithPath('user/email/verify/' . $uuid . '/'.$timestamp.'/' . $uuid . $timestamp . $uuid, $businessId);
+        return $url;
+    }
 }

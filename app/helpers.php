@@ -9,6 +9,11 @@ function businessUrl($businessId = 1){
     return !empty($businesses[$businessId]) ? $businesses[$businessId] : $businesses[1];
 }
 
+function businessUrlWithPath($path, $businessId = 1){
+    $separator = mb_substr($path, 0, 1) == '/' ? '' : '/';
+    return businessUrl($businessId) . $separator . $path;
+}
+
 function businessAssetPath($path, $businessId = 1){
     $separator = mb_substr($path, 0, 1) == '/' ? '' : '/';
     return businessUrl($businessId) . '/assets' . $separator . $path;
