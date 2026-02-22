@@ -263,12 +263,14 @@ class UsersController extends Controller
 
         $getUser = User::find($user->id);
 
-        //event(new Registered($user));
-        $mailData = [
-            'email_subject' => 'Thank you for registering with SEVN. Please verify your account.',
-            'url' => $this->accountVerifyUrlGenerator($getUser->default_business_id, $getUser->uuid),
-        ];
-        $send = Mail::to($getUser->email)->send(new accountVerify($mailData));
+        if (!empty($isNewUser)){
+            $mailData = [
+                'email_subject' => 'Thank you for registering with SEVN. Please verify your account.',
+                'url' => $this->accountVerifyUrlGenerator($getUser->default_business_id, $getUser->uuid),
+            ];
+            Mail::to($getUser->email)->send(new accountVerify($mailData));
+        }
+
 
 
         return response()->json($getUser);
@@ -501,8 +503,6 @@ class UsersController extends Controller
 
         $userId = $request->user_id;
         $expires = $request->expires;
-        $hash = $request->hash;
-        $signature = $request->signature;
 
         $user = User::find($userId);
         if (!empty($user)){

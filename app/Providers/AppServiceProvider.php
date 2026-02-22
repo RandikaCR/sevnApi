@@ -34,17 +34,5 @@ class AppServiceProvider extends ServiceProvider
             );
         });
 
-        /*VerifyEmail::toMailUsing(function (object $notifiable, string $url) {
-
-            $find = url('');
-            $url = str_replace($find, businessUrl(), $url);
-
-            return (new MailMessage)
-                ->subject('Verify SEVN Account!')
-                ->line('Welcome to our platform! Please click the button below to verify your email address and unlock all features.')
-                ->action('Activate My Account', $url)
-                ->line('Thank you for joining!')
-                ->view('mails.account-verify', ['url' => $url]);
-        });*/
     }
 }
