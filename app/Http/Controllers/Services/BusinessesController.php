@@ -4,14 +4,14 @@ namespace App\Http\Controllers\Services;
 
 use App\Helpers\CommonHelper;
 use App\Http\Controllers\Controller;
-use App\Models\UserRoles;
+use App\Models\Businesses;
 use Illuminate\Http\Request;
 
-class UserRolesController extends Controller
+class BusinessesController extends Controller
 {
-    private $screenPrefix = 'user_roles';
+    private $screenPrefix = 'businesses';
 
-    public function getUserRoles(Request $request){
+    public function getBusinesses(Request $request){
 
         $out = [];
 
@@ -31,22 +31,23 @@ class UserRolesController extends Controller
             $currentPage = !empty($request->current_page) ? $request->current_page : 0;
             $mode = !empty($request->mode) ? $request->mode : null;
 
-            $uuId = !empty($request->user_role_id) ? $request->user_role_id : 0;
+            $uuId = !empty($request->business_id) ? $request->business_id : 0;
 
-            $get = UserRoles::select('user_roles.*')
+            $get = Businesses::select('businesses.*')
                 ->when(!empty($uuId), function ($query) use ($uuId) {
                     return $query->where('uuid', $uuId);
                 }, function ($query) use ($request) {
                     $keyword = !empty($request->keyword) ? $request->keyword : '';
                     if (!empty($keyword)){
                         $query->where(function ($query) use ($keyword) {
-                            return $query->orWhere('user_role', 'like', '%'.$keyword.'%')
-                                ->orWhere('display_name', 'like', '%'.$keyword.'%');
+                            return $query->orWhere('business', 'like', '%'.$keyword.'%')
+                                ->orWhere('prefix', 'like', '%'.$keyword.'%')
+                            ->orWhere('url', 'like', '%'.$keyword.'%');
                         });
                     }
                     return $query;
                 })
-                ->orderBy('id', 'ASC');
+                ->orderBy('business', 'ASC');
 
             if (!empty($mode) && $mode == 'for_select'){
                 $out = $get->get();
@@ -58,7 +59,7 @@ class UserRolesController extends Controller
         return response()->json($out);
     }
 
-    public function getUserRole(Request $request){
+    public function getBusiness(Request $request){
         $out = [];
 
         $validate = [
@@ -73,19 +74,24 @@ class UserRolesController extends Controller
         $out['permissions'] = $permissions;
 
         if (empty($isInvalid )) {
-            $uuId = !empty($request->user_role_id) ? $request->user_role_id : 0;
+            $uuId = !empty($request->business_id) ? $request->business_id : 0;
 
-            $out = UserRoles::select('user_roles.*')
+            $out = Businesses::select('businesses.*')
                 ->when(!empty($uuId), function ($query) use ($uuId) {
                     return $query->where('uuid', $uuId);
                 })
+                ->with([
+                    'business_branches' => function ($query) {
+                        return $query->select('business_branches.*')->where('business_branches.status', 1);
+                    }
+                ])
                 ->first();
         }
 
         return response()->json($out);
     }
 
-    public function setUserRole(Request $request){
+    public function setBusiness(Request $request){
         $out = [];
 
         $validate = [
@@ -101,49 +107,51 @@ class UserRolesController extends Controller
 
 
         if (empty($isInvalid)) {
-            $getId = !empty($request->user_role_id) ? $request->user_role_id : 0;
+            $getId = !empty($request->business_id) ? $request->business_id : 0;
 
             if (!empty($getId)){
                 $validated = $request->validate([
-                    'user_role' => 'required|unique:user_roles,user_role,'.$getId .',uuid',
-                    'display_name' => 'required',
+                    'business' => 'required|unique:businesses,business,'.$getId .',uuid',
+                    'prefix' => 'required|unique:businesses,prefix,'.$getId .',uuid',
                 ]);
 
-                $set = UserRoles::where('uuid', $getId)->first();
-                $set->user_role = $request->user_role;
-                $set->display_name = !empty($request->display_name) ? $request->display_name : null;
-                $set->label = !empty($request->label) ? $request->label : null;
+                $set = Businesses::where('uuid', $getId)->first();
+                $set->business = $request->business;
+                $set->prefix = !empty($request->prefix) ? $request->prefix : null;
+                $set->image = !empty($request->image) ? $request->image : null;
+                $set->url = !empty($request->url) ? $request->url : null;
                 $set->save();
 
                 $out['status'] = 'success';
                 $out['message_title'] = 'Success!';
-                $out['message_text'] = 'Dealer has been Updated!';
+                $out['message_text'] = 'Business has been Updated!';
 
             }else{
                 $validated = $request->validate([
-                    'user_role' => 'required|unique:user_roles',
-                    'display_name' => 'required',
+                    'business' => 'required|unique:businesses',
+                    'prefix' => 'required|unique:businesses',
                 ]);
 
-                $set = new UserRoles();
-                $set->user_role = $request->user_role;
-                $set->display_name = !empty($request->display_name) ? $request->display_name : null;
-                $set->label = !empty($request->label) ? $request->label : null;
+                $set = new Businesses();
+                $set->business = $request->business;
+                $set->prefix = !empty($request->prefix) ? $request->prefix : null;
+                $set->image = !empty($request->image) ? $request->image : null;
+                $set->url = !empty($request->url) ? $request->url : null;
                 $set->status = 1;
                 $set->save();
 
 
                 $getCommon = new CommonHelper();
-                $uuId = $getCommon->generateUUId(['business_id' => 0, 'screen' => $this->screenPrefix, 'id' => $set->id]);
+                $uuId = $getCommon->generateUUId(['business_id' => $set->id, 'screen' => $this->screenPrefix, 'id' => $set->id]);
 
-                $update = UserRoles::find($set->id);
+                $update = Businesses::find($set->id);
                 $update->uuid = $uuId;
                 $update->save();
 
 
                 $out['status'] = 'success';
                 $out['message_title'] = 'Success!';
-                $out['message_text'] = 'New Dealer Added!';
+                $out['message_text'] = 'New Business Added!';
 
             }
         }
@@ -171,7 +179,7 @@ class UserRolesController extends Controller
 
             if (!empty($getId)){
 
-                $set = UserRoles::where('uuid', $getId)->first();
+                $set = Businesses::where('uuid', $getId)->first();
                 if (!empty($set) && $set->status == 1){
                     $set->status = 0;
                 }else{

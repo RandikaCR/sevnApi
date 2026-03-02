@@ -1,4 +1,4 @@
-@extends('mails.layout_1')
+@extends('mails.' . $layout)
 
 @section('content')
 

@@ -5,16 +5,11 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
-class Businesses extends Model
+class Colors extends Model
 {
     use HasFactory;
     const CREATED_AT = 'created_at';
     const UPDATED_AT = 'updated_at';
 
-    protected $table = 'businesses';
-
-    public function business_branches()
-    {
-        return $this->hasMany(BusinessBranches::class, 'business_id', 'id');
-    }
+    protected $table = 'colors';
 }

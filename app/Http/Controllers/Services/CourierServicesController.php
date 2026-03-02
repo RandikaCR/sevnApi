@@ -4,14 +4,14 @@ namespace App\Http\Controllers\Services;
 
 use App\Helpers\CommonHelper;
 use App\Http\Controllers\Controller;
-use App\Models\UserRoles;
+use App\Models\CourierServices;
 use Illuminate\Http\Request;
 
-class UserRolesController extends Controller
+class CourierServicesController extends Controller
 {
-    private $screenPrefix = 'user_roles';
+    private $screenPrefix = 'courier_services';
 
-    public function getUserRoles(Request $request){
+    public function getCourierServices(Request $request){
 
         $out = [];
 
@@ -31,22 +31,22 @@ class UserRolesController extends Controller
             $currentPage = !empty($request->current_page) ? $request->current_page : 0;
             $mode = !empty($request->mode) ? $request->mode : null;
 
-            $uuId = !empty($request->user_role_id) ? $request->user_role_id : 0;
+            $uuId = !empty($request->courier_service_id) ? $request->courier_service_id : 0;
 
-            $get = UserRoles::select('user_roles.*')
+            $get = CourierServices::select('courier_services.*')
                 ->when(!empty($uuId), function ($query) use ($uuId) {
                     return $query->where('uuid', $uuId);
                 }, function ($query) use ($request) {
                     $keyword = !empty($request->keyword) ? $request->keyword : '';
                     if (!empty($keyword)){
                         $query->where(function ($query) use ($keyword) {
-                            return $query->orWhere('user_role', 'like', '%'.$keyword.'%')
-                                ->orWhere('display_name', 'like', '%'.$keyword.'%');
+                            return $query->where('courier_service', 'like', '%'.$keyword.'%');
                         });
                     }
                     return $query;
                 })
-                ->orderBy('id', 'ASC');
+                ->orderBy('is_default', 'DESC')
+                ->orderBy('courier_service', 'ASC');
 
             if (!empty($mode) && $mode == 'for_select'){
                 $out = $get->get();
@@ -58,7 +58,7 @@ class UserRolesController extends Controller
         return response()->json($out);
     }
 
-    public function getUserRole(Request $request){
+    public function getCourierService(Request $request){
         $out = [];
 
         $validate = [
@@ -73,9 +73,9 @@ class UserRolesController extends Controller
         $out['permissions'] = $permissions;
 
         if (empty($isInvalid )) {
-            $uuId = !empty($request->user_role_id) ? $request->user_role_id : 0;
+            $uuId = !empty($request->courier_service_id) ? $request->courier_service_id : 0;
 
-            $out = UserRoles::select('user_roles.*')
+            $out = CourierServices::select('courier_services.*')
                 ->when(!empty($uuId), function ($query) use ($uuId) {
                     return $query->where('uuid', $uuId);
                 })
@@ -85,7 +85,7 @@ class UserRolesController extends Controller
         return response()->json($out);
     }
 
-    public function setUserRole(Request $request){
+    public function setCourierService(Request $request){
         $out = [];
 
         $validate = [
@@ -101,34 +101,29 @@ class UserRolesController extends Controller
 
 
         if (empty($isInvalid)) {
-            $getId = !empty($request->user_role_id) ? $request->user_role_id : 0;
+            $getId = !empty($request->courier_service_id) ? $request->courier_service_id : 0;
 
             if (!empty($getId)){
                 $validated = $request->validate([
-                    'user_role' => 'required|unique:user_roles,user_role,'.$getId .',uuid',
-                    'display_name' => 'required',
+                    'courier_service' => 'required|unique:courier_services,courier_service,'.$getId .',uuid',
                 ]);
 
-                $set = UserRoles::where('uuid', $getId)->first();
-                $set->user_role = $request->user_role;
-                $set->display_name = !empty($request->display_name) ? $request->display_name : null;
-                $set->label = !empty($request->label) ? $request->label : null;
+                $set = CourierServices::where('uuid', $getId)->first();
+                $set->courier_service = $request->courier_service;
                 $set->save();
 
                 $out['status'] = 'success';
                 $out['message_title'] = 'Success!';
-                $out['message_text'] = 'Dealer has been Updated!';
+                $out['message_text'] = 'Courier Service has been Updated!';
 
             }else{
                 $validated = $request->validate([
-                    'user_role' => 'required|unique:user_roles',
-                    'display_name' => 'required',
+                    'courier_service' => 'required|unique:courier_services',
                 ]);
 
-                $set = new UserRoles();
-                $set->user_role = $request->user_role;
-                $set->display_name = !empty($request->display_name) ? $request->display_name : null;
-                $set->label = !empty($request->label) ? $request->label : null;
+                $set = new CourierServices();
+                $set->courier_service = $request->courier_service;
+                $set->is_default = 0;
                 $set->status = 1;
                 $set->save();
 
@@ -136,14 +131,14 @@ class UserRolesController extends Controller
                 $getCommon = new CommonHelper();
                 $uuId = $getCommon->generateUUId(['business_id' => 0, 'screen' => $this->screenPrefix, 'id' => $set->id]);
 
-                $update = UserRoles::find($set->id);
+                $update = CourierServices::find($set->id);
                 $update->uuid = $uuId;
                 $update->save();
 
 
                 $out['status'] = 'success';
                 $out['message_title'] = 'Success!';
-                $out['message_text'] = 'New Dealer Added!';
+                $out['message_text'] = 'New Courier Service Added!';
 
             }
         }
@@ -171,7 +166,7 @@ class UserRolesController extends Controller
 
             if (!empty($getId)){
 
-                $set = UserRoles::where('uuid', $getId)->first();
+                $set = CourierServices::where('uuid', $getId)->first();
                 if (!empty($set) && $set->status == 1){
                     $set->status = 0;
                 }else{
@@ -190,4 +185,46 @@ class UserRolesController extends Controller
 
         return response()->json($out);
     }
+
+    public function setDefault(Request $request){
+        $out = [];
+
+        $validate = [
+            'screen' => $this->screenPrefix,
+            'allowed_user_roles' => [2],
+            'allowed_permissions' => ['is_view' => 1, 'is_create' => 1, 'is_update' => 1],
+        ];
+
+        $check = $this->validateUserPermissions($validate);
+        $isInvalid = $check['is_invalid'];
+        $permissions = $check['permissions'];
+        $out['permissions'] = $permissions;
+
+
+        if (empty($isInvalid)) {
+            $getId = !empty($request->id) ? $request->id : 0;
+
+            if (!empty($getId)){
+
+                $courierServices = CourierServices::where('is_default', 1)->get();
+                foreach ($courierServices as $cs){
+                    $c = CourierServices::find($cs->id);
+                    $c->is_default = 0;
+                    $c->save();
+                }
+
+                $set = CourierServices::where('uuid', $getId)->first();
+                $set->is_default = 1;
+                $set->save();
+
+                $out['status'] = 'success';
+                $out['message_title'] = 'Success!';
+                $out['message_text'] = 'Default courier service has been updated!';
+
+            }
+        }
+
+        return response()->json($out);
+    }
+
 }

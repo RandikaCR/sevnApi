@@ -4,14 +4,14 @@ namespace App\Http\Controllers\Services;
 
 use App\Helpers\CommonHelper;
 use App\Http\Controllers\Controller;
-use App\Models\UserRoles;
+use App\Models\GenderCategories;
 use Illuminate\Http\Request;
 
-class UserRolesController extends Controller
+class GenderCategoriesController extends Controller
 {
-    private $screenPrefix = 'user_roles';
+    private $screenPrefix = 'gender_categories';
 
-    public function getUserRoles(Request $request){
+    public function getGenderCategories(Request $request){
 
         $out = [];
 
@@ -31,22 +31,23 @@ class UserRolesController extends Controller
             $currentPage = !empty($request->current_page) ? $request->current_page : 0;
             $mode = !empty($request->mode) ? $request->mode : null;
 
-            $uuId = !empty($request->user_role_id) ? $request->user_role_id : 0;
+            $uuId = !empty($request->gender_category_id) ? $request->gender_category_id : 0;
 
-            $get = UserRoles::select('user_roles.*')
+            $get = GenderCategories::select('gender_categories.*')
                 ->when(!empty($uuId), function ($query) use ($uuId) {
-                    return $query->where('uuid', $uuId);
+                    return $query->where('gender_categories.uuid', $uuId);
                 }, function ($query) use ($request) {
                     $keyword = !empty($request->keyword) ? $request->keyword : '';
                     if (!empty($keyword)){
                         $query->where(function ($query) use ($keyword) {
-                            return $query->orWhere('user_role', 'like', '%'.$keyword.'%')
-                                ->orWhere('display_name', 'like', '%'.$keyword.'%');
+                            return $query->orWhere('gender_categories.gender_category', 'like', '%'.$keyword.'%');
                         });
                     }
                     return $query;
                 })
-                ->orderBy('id', 'ASC');
+
+                ->orderBy('gender_categories.display_order', 'ASC')
+                ->orderBy('gender_categories.gender_category', 'ASC');
 
             if (!empty($mode) && $mode == 'for_select'){
                 $out = $get->get();
@@ -58,7 +59,7 @@ class UserRolesController extends Controller
         return response()->json($out);
     }
 
-    public function getUserRole(Request $request){
+    public function getGenderCategory(Request $request){
         $out = [];
 
         $validate = [
@@ -73,11 +74,11 @@ class UserRolesController extends Controller
         $out['permissions'] = $permissions;
 
         if (empty($isInvalid )) {
-            $uuId = !empty($request->user_role_id) ? $request->user_role_id : 0;
+            $uuId = !empty($request->gender_category_id) ? $request->gender_category_id : 0;
 
-            $out = UserRoles::select('user_roles.*')
+            $out = GenderCategories::select('gender_categories.*')
                 ->when(!empty($uuId), function ($query) use ($uuId) {
-                    return $query->where('uuid', $uuId);
+                    return $query->where('gender_categories.uuid', $uuId);
                 })
                 ->first();
         }
@@ -85,7 +86,7 @@ class UserRolesController extends Controller
         return response()->json($out);
     }
 
-    public function setUserRole(Request $request){
+    public function setGenderCategory(Request $request){
         $out = [];
 
         $validate = [
@@ -101,34 +102,38 @@ class UserRolesController extends Controller
 
 
         if (empty($isInvalid)) {
-            $getId = !empty($request->user_role_id) ? $request->user_role_id : 0;
+            $getId = !empty($request->gender_category_id) ? $request->gender_category_id : 0;
 
             if (!empty($getId)){
                 $validated = $request->validate([
-                    'user_role' => 'required|unique:user_roles,user_role,'.$getId .',uuid',
-                    'display_name' => 'required',
+                    'gender_category' => 'required|unique:gender_categories,gender_category,'.$getId .',uuid',
                 ]);
 
-                $set = UserRoles::where('uuid', $getId)->first();
-                $set->user_role = $request->user_role;
-                $set->display_name = !empty($request->display_name) ? $request->display_name : null;
-                $set->label = !empty($request->label) ? $request->label : null;
+                $c = new CommonHelper();
+                $slug = $c->generateSeoURL($request->gender_category, 1);
+
+                $set = GenderCategories::where('uuid', $getId)->first();
+                $set->gender_category = $request->gender_category;
+                $set->display_order = !empty($request->display_order) ? $request->display_order : 0;
+                $set->slug = $slug;
                 $set->save();
 
                 $out['status'] = 'success';
                 $out['message_title'] = 'Success!';
-                $out['message_text'] = 'Dealer has been Updated!';
+                $out['message_text'] = 'Gender Category has been Updated!';
 
             }else{
                 $validated = $request->validate([
-                    'user_role' => 'required|unique:user_roles',
-                    'display_name' => 'required',
+                    'gender_category' => 'required|unique:gender_categories',
                 ]);
 
-                $set = new UserRoles();
-                $set->user_role = $request->user_role;
-                $set->display_name = !empty($request->display_name) ? $request->display_name : null;
-                $set->label = !empty($request->label) ? $request->label : null;
+                $c = new CommonHelper();
+                $slug = $c->generateSeoURL($request->gender_category, 1);
+
+                $set = new GenderCategories();
+                $set->gender_category = $request->gender_category;
+                $set->display_order = !empty($request->display_order) ? $request->display_order : 0;
+                $set->slug = $slug;
                 $set->status = 1;
                 $set->save();
 
@@ -136,14 +141,14 @@ class UserRolesController extends Controller
                 $getCommon = new CommonHelper();
                 $uuId = $getCommon->generateUUId(['business_id' => 0, 'screen' => $this->screenPrefix, 'id' => $set->id]);
 
-                $update = UserRoles::find($set->id);
+                $update = GenderCategories::find($set->id);
                 $update->uuid = $uuId;
                 $update->save();
 
 
                 $out['status'] = 'success';
                 $out['message_title'] = 'Success!';
-                $out['message_text'] = 'New Dealer Added!';
+                $out['message_text'] = 'New Gender Category Added!';
 
             }
         }
@@ -171,7 +176,7 @@ class UserRolesController extends Controller
 
             if (!empty($getId)){
 
-                $set = UserRoles::where('uuid', $getId)->first();
+                $set = GenderCategories::where('uuid', $getId)->first();
                 if (!empty($set) && $set->status == 1){
                     $set->status = 0;
                 }else{

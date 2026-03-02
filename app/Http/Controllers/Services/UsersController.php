@@ -8,12 +8,15 @@ use App\Helpers\UsersHelper;
 use App\Http\Controllers\Controller;
 use App\Mail\accountVerify;
 use App\Mail\testMail;
+use App\Models\BusinessBranches;
+use App\Models\Businesses;
 use App\Models\Designations;
 use App\Models\User;
 use App\Models\UserApplicationSettings;
 use App\Models\UserBusinessBranches;
 use App\Models\UserBusinesses;
 use App\Models\UserRoles;
+use App\Models\UserTitles;
 use Illuminate\Auth\Events\Registered;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -33,7 +36,7 @@ class UsersController extends Controller
 
         $validate = [
             'screen' => $this->screenPrefix,
-            'allowed_user_roles' => [1, 2],
+            'allowed_user_roles' => [2],
             'allowed_permissions' => ['is_view' => 1],
         ];
 
@@ -48,7 +51,7 @@ class UsersController extends Controller
             $currentPage = !empty($request->current_page) ? $request->current_page : 0;
 
             $keyword = !empty($request->keyword) ? $request->keyword : '';
-            $userId = !empty($request->user_id) ? $request->user_id : 0;
+            $uuId = !empty($request->user_id) ? $request->user_id : 0;
             $publicKey = !empty($request->public_key) ? $request->public_key : 0;
             $userRoleId = !empty($request->user_role_id) ? $request->user_role_id : 0;
             $isDeletedOnly = !empty($request->is_deleted) ? $request->is_deleted : 0;
@@ -57,17 +60,17 @@ class UsersController extends Controller
             $out = User::select(
                 'users.*',
                 'user_roles.user_role',
-                'dealers.dealer AS default_dealer'
+                'businesses.business AS default_business'
             )
                 ->join('user_roles', 'users.user_role_id', 'user_roles.id')
-                ->leftJoin('dealers', 'users.switched_business_id', 'dealers.id')
+                ->leftJoin('businesses', 'users.default_business_id', 'businesses.id')
                 ->when(!empty($keyword), function ($query) use ($keyword) {
                     return $query->where(DB::raw(DBHelper::dbConcat('users', 'first_name','users', 'last_name')), 'like', '%' . $keyword . '%')
                         ->orWhere('users.public_key', 'like', '%' . $keyword . '%')
                         ->orWhere('users.email', 'like', '%' . $keyword . '%');
                 })
-                ->when(!empty($userId), function ($query) use ($userId) {
-                    return $query->where('users.uuid', $userId);
+                ->when(!empty($uuId), function ($query) use ($uuId) {
+                    return $query->where('users.uuid', $uuId);
                 })
                 ->when(!empty($publicKey), function ($query) use ($publicKey) {
                     return $query->where('users.public_key', $publicKey);
@@ -81,25 +84,6 @@ class UsersController extends Controller
                     return $query->where('users.is_deleted', 0);
                 })
                 ->where('users.status', $status)
-                ->with([
-                    'user_dealers' => function ($query) use ($request){
-                        return $query->select(
-                            'user_dealers.*',
-                            'dealers.dealer',
-                            'dealers.motordat_id',
-                        )
-                            ->join('dealers', 'user_dealers.business_id', 'dealers.id')
-                            ->where('dealers.status', 1);
-                    },
-                    'user_screens' => function ($query) use ($request){
-                        return $query->select(
-                            'user_screens.*',
-                            'screens.screen',
-                            'screens.screen_prefix',
-                        )
-                            ->join('screens', 'user_screens.screen_id', 'screens.id');
-                    }
-                ])
                 ->orderBy('id', 'ASC')
                 ->paginate($itemsPerPage, ['*'], 'page', $currentPage);
         }
@@ -195,65 +179,37 @@ class UsersController extends Controller
             $businessId = !empty($request->registered_business_id) ? $request->registered_business_id : 1;
 
             // Set Default User Business
-            $getUuIdRes = [
-                'business_id' => $request->registered_business_id,
-                'screen' => 'user_businesses',
-                'id' => 0,
+            $ubRes = [
+                'id' => 0, // uuid
+                'user_id' => $user->id,
+                'business_id' => $businessId,
             ];
-            $getCommon = new CommonHelper();
-            $uuId = $getCommon->generateUUId($getUuIdRes);
-
-            $ub = new UserBusinesses();
-            $ub->uuid = $uuId;
-            $ub->user_id = $user->id;
-            $ub->business_id = $request->registered_business_id;
-            $ub->status = 1;
-            $ub->save();
+            $ub = $this->setUserBusiness($ubRes);
 
             // Set Default User Business Branch
-            $getUuIdRes = [
-                'business_id' => $request->registered_business_id,
-                'screen' => 'user_business_branches',
-                'id' => 0,
+            $ubbRes = [
+                'id' => 0, // uuid
+                'user_id' => $user->id,
+                'business_id' => $businessId,
+                'business_branch_id' =>$request->registered_business_branch_id,
             ];
-            $getCommon = new CommonHelper();
-            $uuId = $getCommon->generateUUId($getUuIdRes);
-
-            $ubb = new UserBusinessBranches();
-            $ubb->uuid = $uuId;
-            $ubb->user_id = $user->id;
-            $ubb->business_branch_id = $request->registered_business_branch_id;
-            $ubb->status = 1;
-            $ubb->save();
+            $ubb = $this->setUserBusinessBranch($ubbRes);
 
             // Set Default User Application Settings
-            $getUuIdRes = [
-                'business_id' => $ub->id,
-                'screen' => 'user_application_settings',
-                'id' => 0,
+            $uasRes = [
+                'id' => 0, // uuid
+                'user_id' => $user->id,
+                'business_id' => $businessId,
+                'theme_layout_mode' => 'light',
+                'theme_topbar' => 'dark',
+                'theme_sidebar' => 'dark',
             ];
-            $getCommon = new CommonHelper();
-            $uuId = $getCommon->generateUUId($getUuIdRes);
+            $uas = $this->setUserApplicationSetting($uasRes);
 
-            $uas = new UserApplicationSettings();
-            $uas->uuid = $uuId;
-            $uas->user_id = $user->id;
-            $uas->business_id = $businessId;
-            $uas->theme_layout_mode = !empty($applicationSetting->theme_layout_mode) ? $applicationSetting->theme_layout_mode : 'light';
-            $uas->theme_topbar = !empty($applicationSetting->theme_topbar) ? $applicationSetting->theme_topbar : 'dark';
-            $uas->theme_sidebar = !empty($applicationSetting->theme_sidebar) ? $applicationSetting->theme_sidebar : 'dark';
-            $uas->status = 1;
-            $uas->save();
 
             // Update User Info
-            $getUuIdRes = [
-                'business_id' => $businessId,
-                'screen' => $this->screenPrefix,
-                'id' => $user->id,
-            ];
-
             $getCommon = new CommonHelper();
-            $uuId = $getCommon->generateUUId($getUuIdRes);
+            $uuId = $getCommon->generateUUId(['business_id' => $businessId, 'screen' => $this->screenPrefix, 'id' => $user->id]);
             $tUser = User::find($user->id);
             $tUser->uuid = $uuId;
             $tUser->default_business_id = $ub->id;
@@ -264,16 +220,106 @@ class UsersController extends Controller
         $getUser = User::find($user->id);
 
         if (!empty($isNewUser)){
+
+            $b = new CommonHelper();
+            $b = $b->getBusiness($getUser->default_business_id);
+
             $mailData = [
+                'layout' => $b->prefix,
                 'email_subject' => 'Thank you for registering with SEVN. Please verify your account.',
                 'url' => $this->accountVerifyUrlGenerator($getUser->default_business_id, $getUser->uuid),
             ];
             Mail::to($getUser->email)->send(new accountVerify($mailData));
         }
 
-
-
         return response()->json($getUser);
+    }
+
+    public function setUserBusiness($res){
+
+        $id = !empty($res['uuid']) ? $res['uuid'] : 0;
+        $userId = !empty($res['user_id']) ? $res['user_id'] : 0;
+        $businessId = !empty($res['business_id']) ? $res['business_id'] : 0;
+
+        if (!empty($id)){
+            $save = UserBusinesses::where('uuid', $id)->first();
+        }else{
+
+            $getCommon = new CommonHelper();
+            $uuId = $getCommon->generateUUId(['business_id' => $businessId, 'screen' => 'user_businesses', 'id' => 0]);
+
+            $save = new UserBusinesses();
+            $save->uuid = $uuId;
+            $save->status = 1;
+        }
+
+        $save->user_id = $userId;
+        $save->business_id = $businessId;
+        $save->save();
+
+        return $save;
+    }
+
+    public function setUserBusinessBranch($res){
+
+        $id = !empty($res['uuid']) ? $res['uuid'] : 0;
+        $userId = !empty($res['user_id']) ? $res['user_id'] : 0;
+        $businessId = !empty($res['business_id']) ? $res['business_id'] : 0;
+        $businessBranchId = !empty($res['business_branch_id']) ? $res['business_branch_id'] : 0;
+
+        if (!empty($id)){
+            $save = UserBusinessBranches::where('uuid', $id)->first();
+        }else{
+
+            $getCommon = new CommonHelper();
+            $uuId = $getCommon->generateUUId(['business_id' => $businessId, 'screen' => 'user_business_branches', 'id' => 0]);
+
+            $save = new UserBusinessBranches();
+            $save->uuid = $uuId;
+            $save->status = 1;
+        }
+
+        $save->user_id = $userId;
+        $save->business_branch_id = $businessBranchId;
+        $save->save();
+
+        return $save;
+    }
+
+    public function setUserApplicationSetting($res){
+
+        $id = !empty($res['uuid']) ? $res['uuid'] : 0;
+        $userId = !empty($res['user_id']) ? $res['user_id'] : 0;
+        $businessId = !empty($res['business_id']) ? $res['business_id'] : 0;
+
+        if (!empty($id)){
+            $save = UserApplicationSettings::where('uuid', $id)->first();
+        }else {
+
+
+            $getCommon = new CommonHelper();
+            $uuId = $getCommon->generateUUId(['business_id' => $businessId, 'screen' => 'user_application_settings', 'id' => 0]);
+
+            $save = new UserApplicationSettings();
+            $save->uuid = $uuId;
+            $save->user_id = $userId;
+            $save->business_id = $businessId;
+            $save->status = 1;
+        }
+
+        if (!empty($res['theme_layout_mode'])){
+            $save->theme_layout_mode = $res['theme_layout_mode'];
+        }
+        if (!empty($res['theme_topbar'])){
+            $save->theme_topbar = $res['theme_topbar'];
+        }
+        if (!empty($res['theme_sidebar'])){
+            $save->theme_sidebar = $res['theme_sidebar'];
+        }
+
+        $save->save();
+
+        return $save;
     }
 
 
@@ -287,12 +333,12 @@ class UsersController extends Controller
 
         if (!empty($mode) && $mode == 'personal'){
 
-            APIValidator::validate($request, [
-                'first_name' => ['required', 'string', 'max:255'],
-                'last_name' => ['required', 'string', 'max:255'],
+            $validated = $request->validate([
+                'first_name' => 'required|string|max:255',
+                'last_name' => 'required|string|max:255',
             ]);
 
-            $user = User::where('uuid', $request->uuid)->first();
+            $user = User::where('uuid', $request->user_id)->first();
 
             $user->first_name = $request->first_name;
             $user->last_name = $request->last_name;
@@ -321,7 +367,8 @@ class UsersController extends Controller
                 'password' => ['required', 'confirmed', Rules\Password::defaults()],
             ]);
 
-            $user = User::where('uuid', $request->uuid)->first();
+
+            $user = User::where('uuid', $request->user_id)->first();
 
             if (Hash::check($request->password_current, $user->password)) {
 
@@ -431,45 +478,55 @@ class UsersController extends Controller
             }
             else{
 
-                /*$dealer = (Object)[
-                    'dealer' => null,
-                    'motordat_id' => null,
+                $business = (Object)[
+                    'branch' => null,
                 ];
 
-                if(!empty($user->switched_business_id)){
-                    $dealer = Dealers::find($user->switched_business_id);
+                $branch = (Object)[
+                    'business' => null,
+                ];
+
+                $designation = null;
+
+                if(!empty($user->default_business_id)){
+                    $business = Businesses::find($user->default_business_id);
+                    $des = Designations::select('designations.*')
+                    ->join('user_businesses', 'user_businesses.designation_id', '=', 'designations.id')
+                    ->where('user_businesses.id', $user->default_business_id)
+                    ->groupBy('user_businesses.id')
+                    ->first();
+                    if (!empty($des)){
+                        $designation = $des->designation;
+                    }
+                }
+                if(!empty($user->default_business_branch_id)){
+                    $branch = BusinessBranches::find($user->default_business_branch_id);
                 }
 
-                $req = ['user_id' => $user->uuid];
+                $as = UserApplicationSettings::where('user_id', $user->id)->where('business_id', $user->default_business_id)->first();
 
-                $dh = new DealersHelper();
-                $dealers = $dh->getUserDealers($req);
+                $req = ['user_id' => $user->id, 'business_id' => $user->default_business_id];
+                $dh = new CommonHelper();
+                $businesses = $dh->getUserBusinesses($req);
 
-
-                if (!empty($dealer->status) && $dealer->status == 1){
-                    $out = [
-                        'status' => 'success',
-                        'message' => '',
-                        'id' => $user->uuid,
-                        'user_role_id' => $user->user_role_id,
-                        'first_name' => $user->first_name,
-                        'last_name' => $user->last_name,
-                        'email' => $user->email,
-                        'token' => $user->public_key,
-                        'switched_business_id' => $user->switched_business_id,
-                        'switched_dealer' => $dealer->dealer,
-                        'dealer_motordat_id' => $dealer->motordat_id,
-                        'site_layout_mode' => $user->site_layout_mode,
-                        'site_topbar' => $user->site_topbar,
-                        'side_sidebar' => $user->side_sidebar,
-                        'dealers' => $dealers,
-                    ];
-                }else{
-                    $out = [
-                        'status' => 'error',
-                        'message' => 'Dealer is not Available. Please contact admin.',
-                    ];
-                }*/
+                $out = [
+                    'status' => 'success',
+                    'message' => '',
+                    'id' => $user->uuid,
+                    'user_role_id' => $user->user_role_id,
+                    'first_name' => $user->first_name,
+                    'last_name' => $user->last_name,
+                    'email' => $user->email,
+                    'designation' => $designation,
+                    'image' => $user->image,
+                    'token' => $user->public_key,
+                    'default_business_id' => $user->default_business_id,
+                    'default_business' => $business->business,
+                    'default_business_branch_id' => $user->default_business_branch_id,
+                    'default_business_branch' => $branch->business_branch,
+                    'businesses' => $businesses,
+                    'application_settings' => $as,
+                ];
 
             }
         }
@@ -528,13 +585,13 @@ class UsersController extends Controller
     }
 
 
-    public function getUserDealers(Request $request){
+    public function getUserBusinesses(Request $request){
 
         $out = [];
 
         $validate = [
             'screen' => $this->screenPrefix,
-            'allowed_user_roles' => [1, 2],
+            'allowed_user_roles' => [2],
             'allowed_permissions' => ['is_view' => 1],
         ];
 
@@ -550,25 +607,95 @@ class UsersController extends Controller
 
             $keyword = !empty($request->keyword) ? $request->keyword : '';
             $userId = !empty($request->uuid) ? $request->uuid : 0;
-            $dealerId = !empty($request->business_id) ? $request->business_id : 0;
+            $businessId = !empty($request->business_id) ? $request->business_id : 0;
             $status = !empty($request->status) ? $request->status : 1;
 
 
-            /*$out = UserDealers::select(
-                'user_dealers.*',
-                'dealers.dealer',
+            $out = UserBusinesses::select(
+                'user_businesses.*',
+                'businesses.uuid as business_uuid',
+                'businesses.business',
+                'businesses.image',
+                'designations.designation',
             )
-                ->join('dealers', 'user_dealers.business_id', 'dealers.id')
-                ->join('users', 'user_dealers.user_id', 'users.id')
+                ->join('businesses', 'user_businesses.business_id', 'businesses.id')
+                ->join('users', 'user_businesses.user_id', 'users.id')
+                ->leftJoin('designations', 'user_businesses.designation_id', 'designations.id')
                 ->where('users.uuid', $userId)
-                ->when(!empty($dealerId), function ($query) use ($dealerId) {
-                    return $query->where('dealers.uuid', $dealerId);
+                ->when(!empty($businessId), function ($query) use ($businessId) {
+                    return $query->where('businesses.uuid', $businessId);
                 })
                 ->when(!empty($keyword), function ($query) use ($keyword) {
-                    return $query->where('dealers.dealer', 'like', '%' . $keyword . '%');
+                    return $query->where('businesses.business', 'like', '%' . $keyword . '%');
                 })
-                ->orderBy('dealers.dealer', 'ASC')
-                ->paginate($itemsPerPage, ['*'], 'page', $currentPage);*/
+                ->with([
+                    'user_business_branches' => function ($query) {
+                        return $query->select(
+                            'user_business_branches.*',
+                            'business_branches.business_id',
+                            'business_branches.business_branch',
+                            'businesses.business',
+                        )
+                            ->join('business_branches', 'user_business_branches.business_branch_id', 'business_branches.id')
+                            ->join('businesses', 'business_branches.business_id', 'businesses.id')
+                            ->where('business_branches.status', 1)
+                            ->where('businesses.status', 1);
+                    },
+                ])
+                ->orderBy('businesses.business', 'ASC')
+                ->groupBy('user_businesses.business_id')
+                ->paginate($itemsPerPage, ['*'], 'page', $currentPage);
+        }
+
+        return response()->json($out);
+    }
+
+    public function getUserBusinessBranches(Request $request){
+
+        $out = [];
+
+        $validate = [
+            'screen' => $this->screenPrefix,
+            'allowed_user_roles' => [2],
+            'allowed_permissions' => ['is_view' => 1],
+        ];
+
+        $check = $this->validateUserPermissions($validate);
+        $isInvalid = $check['is_invalid'];
+        $permissions = $check['permissions'];
+        $out['permissions'] = $permissions;
+
+
+        if (empty($isInvalid)){
+            $itemsPerPage = !empty($request->items_per_page) ? $request->items_per_page : $this->defaultItemsPerPage;
+            $currentPage = !empty($request->current_page) ? $request->current_page : 0;
+
+            $keyword = !empty($request->keyword) ? $request->keyword : '';
+            $userId = !empty($request->uuid) ? $request->uuid : 0;
+            $businessId = !empty($request->business_id) ? $request->business_id : 0;
+            $status = !empty($request->status) ? $request->status : 1;
+
+
+            $out = UserBusinessBranches::select(
+                'user_business_branches.*',
+                'business_branches.business_branch',
+                'businesses.business',
+                'businesses.image',
+            )
+                ->join('business_branches', 'user_business_branches.business_branch_id', 'business_branches.id')
+                ->join('businesses', 'business_branches.business_id', 'businesses.id')
+                ->join('users', 'user_business_branches.user_id', 'users.id')
+                ->where('users.uuid', $userId)
+                ->when(!empty($businessId), function ($query) use ($businessId) {
+                    return $query->where('businesses.uuid', $businessId);
+                })
+                ->when(!empty($keyword), function ($query) use ($keyword) {
+                    return $query->where('businesses.business', 'like', '%' . $keyword . '%')
+                        ->orWhere('business_branches.business_branch', 'like', '%' . $keyword . '%');
+                })
+                ->orderBy('business_branches.business_branch', 'ASC')
+                ->groupBy('user_business_branches.business_branch_id')
+                ->paginate($itemsPerPage, ['*'], 'page', $currentPage);
         }
 
         return response()->json($out);
@@ -581,7 +708,7 @@ class UsersController extends Controller
 
         $validate = [
             'screen' => 'user_dealers',
-            'allowed_user_roles' => [1, 2],
+            'allowed_user_roles' => [2],
             'allowed_permissions' => ['is_view' => 1, 'is_create' => 1, 'is_update' => 1],
         ];
 

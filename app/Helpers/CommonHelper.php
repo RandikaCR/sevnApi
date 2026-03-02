@@ -4,7 +4,9 @@ namespace App\Helpers;
 
 
 use App\Models\ApplicationSettings;
+use App\Models\Businesses;
 use App\Models\User;
+use App\Models\UserBusinesses;
 use App\Models\UserScreens;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -99,6 +101,34 @@ class CommonHelper
         return (Object)$out;
     }
 
+    public function getBusiness($businessId = 1){
+        $out = Businesses::find($businessId);
+        return $out;
+    }
+
+    public function getUserBusinesses($req = [] ){
+
+        $userId = !empty($req['user_id']) ? $req['user_id'] : 0;
+        $businessId = !empty($req['business_id']) ? $req['business_id'] : 0;
+
+        $out = UserBusinesses::select(
+            'user_businesses.*',
+            'businesses.prefix',
+            'businesses.business',
+            'businesses.image',
+            'businesses.url',
+            'designations.designation',
+        )
+            ->join('businesses', 'user_businesses.business_id', 'businesses.id')
+            ->join('designations', 'user_businesses.designation_id', 'designations.id')
+            ->where('user_businesses.user_id', $userId)
+            ->where('user_businesses.business_id', $businessId)
+            ->where('user_businesses.status', '1')
+            ->get();
+
+        return $out;
+    }
+
     public function getApplicationSettings($req = []){
 
         $out = [];
@@ -130,5 +160,38 @@ class CommonHelper
         }
 
         return $refId;
+    }
+
+    public function generateSeoURL($string, $withoutTimestamp = 0, $wordLimit = 0){
+        $separator = '-';
+
+        if($wordLimit != 0){
+            $wordArr = explode(' ', $string);
+            $string = implode(' ', array_slice($wordArr, 0, $wordLimit));
+        }
+
+        $quoteSeparator = preg_quote($separator, '#');
+
+        $trans = array(
+            '&.+?;'                 => '',
+            '[^\w\d _-]'            => '',
+            '\s+'                   => $separator,
+            '('.$quoteSeparator.')+'=> $separator
+        );
+
+        $string = strip_tags($string);
+        foreach ($trans as $key => $val){
+            $string = preg_replace('#'.$key.'#iu', $val, $string);
+        }
+
+        $string = strtolower($string);
+
+        if (!empty($withoutTimestamp)){
+            $slug = trim(trim($string, $separator));
+        }else{
+            $slug = trim(trim($string, $separator)) . '-' . time();
+        }
+
+        return $slug;
     }
 }

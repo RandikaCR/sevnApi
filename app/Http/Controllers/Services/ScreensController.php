@@ -4,15 +4,13 @@ namespace App\Http\Controllers\Services;
 
 use App\Helpers\CommonHelper;
 use App\Http\Controllers\Controller;
-use App\Models\UserRoles;
+use App\Models\Screens;
 use Illuminate\Http\Request;
 
-class UserRolesController extends Controller
+class ScreensController extends Controller
 {
-    private $screenPrefix = 'user_roles';
-
-    public function getUserRoles(Request $request){
-
+    private $screenPrefix = 'screens';
+    public function getScreens(Request $request){
         $out = [];
 
         $validate = [
@@ -31,22 +29,22 @@ class UserRolesController extends Controller
             $currentPage = !empty($request->current_page) ? $request->current_page : 0;
             $mode = !empty($request->mode) ? $request->mode : null;
 
-            $uuId = !empty($request->user_role_id) ? $request->user_role_id : 0;
+            $uuId = !empty($request->screen_id) ? $request->screen_id : 0;
 
-            $get = UserRoles::select('user_roles.*')
+            $get = Screens::select('screens.*')
                 ->when(!empty($uuId), function ($query) use ($uuId) {
                     return $query->where('uuid', $uuId);
                 }, function ($query) use ($request) {
                     $keyword = !empty($request->keyword) ? $request->keyword : '';
                     if (!empty($keyword)){
                         $query->where(function ($query) use ($keyword) {
-                            return $query->orWhere('user_role', 'like', '%'.$keyword.'%')
-                                ->orWhere('display_name', 'like', '%'.$keyword.'%');
+                            return $query->orWhere('screen', 'like', '%'.$keyword.'%')
+                                ->orWhere('screen_prefix', 'like', '%'.$keyword.'%');
                         });
                     }
                     return $query;
                 })
-                ->orderBy('id', 'ASC');
+                ->orderBy('screen', 'ASC');
 
             if (!empty($mode) && $mode == 'for_select'){
                 $out = $get->get();
@@ -55,10 +53,12 @@ class UserRolesController extends Controller
             }
         }
 
+
+
         return response()->json($out);
     }
 
-    public function getUserRole(Request $request){
+    public function getScreen(Request $request){
         $out = [];
 
         $validate = [
@@ -72,10 +72,10 @@ class UserRolesController extends Controller
         $permissions = $check['permissions'];
         $out['permissions'] = $permissions;
 
-        if (empty($isInvalid )) {
-            $uuId = !empty($request->user_role_id) ? $request->user_role_id : 0;
+        if (empty($isInvalid)){
+            $uuId = !empty($request->screen_id) ? $request->screen_id : 0;
 
-            $out = UserRoles::select('user_roles.*')
+            $out = Screens::select('screens.*')
                 ->when(!empty($uuId), function ($query) use ($uuId) {
                     return $query->where('uuid', $uuId);
                 })
@@ -85,8 +85,10 @@ class UserRolesController extends Controller
         return response()->json($out);
     }
 
-    public function setUserRole(Request $request){
+
+    public function setScreen(Request $request){
         $out = [];
+
 
         $validate = [
             'screen' => $this->screenPrefix,
@@ -99,54 +101,56 @@ class UserRolesController extends Controller
         $permissions = $check['permissions'];
         $out['permissions'] = $permissions;
 
-
-        if (empty($isInvalid)) {
-            $getId = !empty($request->user_role_id) ? $request->user_role_id : 0;
+        if (empty($isInvalid)){
+            $getId = !empty($request->screen_id) ? $request->screen_id : 0;
+            $businessId = !empty($request->business_id) ? $request->business_id : 1;
+            $screen = !empty($request->screen) ? $request->screen : null;
+            $screenPrefix = !empty($request->screen_prefix) ? $request->screen_prefix : null;
 
             if (!empty($getId)){
                 $validated = $request->validate([
-                    'user_role' => 'required|unique:user_roles,user_role,'.$getId .',uuid',
-                    'display_name' => 'required',
+                    'screen' => 'required|unique:screens,screen,'.$getId .',uuid',
+                    'screen_prefix' => 'required|unique:screens,screen_prefix,'.$getId .',uuid',
                 ]);
 
-                $set = UserRoles::where('uuid', $getId)->first();
-                $set->user_role = $request->user_role;
-                $set->display_name = !empty($request->display_name) ? $request->display_name : null;
-                $set->label = !empty($request->label) ? $request->label : null;
+                $set = Screens::where('uuid', $getId)->first();
+                $set->screen = $screen;
+                $set->screen_prefix = $screenPrefix;
                 $set->save();
 
                 $out['status'] = 'success';
                 $out['message_title'] = 'Success!';
-                $out['message_text'] = 'Dealer has been Updated!';
+                $out['message_text'] = 'Screen has been Updated!';
 
             }else{
                 $validated = $request->validate([
-                    'user_role' => 'required|unique:user_roles',
-                    'display_name' => 'required',
+                    'screen' => 'required|unique:screens',
+                    'screen_prefix' => 'required|unique:screens',
                 ]);
 
-                $set = new UserRoles();
-                $set->user_role = $request->user_role;
-                $set->display_name = !empty($request->display_name) ? $request->display_name : null;
-                $set->label = !empty($request->label) ? $request->label : null;
+                $set = new Screens();
+                $set->business_id = $businessId;
+                $set->screen = $screen;
+                $set->screen_prefix = $screenPrefix;
                 $set->status = 1;
                 $set->save();
 
+                $update = Screens::find($set->id);
+
 
                 $getCommon = new CommonHelper();
-                $uuId = $getCommon->generateUUId(['business_id' => 0, 'screen' => $this->screenPrefix, 'id' => $set->id]);
-
-                $update = UserRoles::find($set->id);
+                $uuId = $getCommon->generateUUId(['business_id' => $businessId, 'screen' => $this->screenPrefix, 'id' => $set->id]);
                 $update->uuid = $uuId;
                 $update->save();
 
 
                 $out['status'] = 'success';
                 $out['message_title'] = 'Success!';
-                $out['message_text'] = 'New Dealer Added!';
+                $out['message_text'] = 'New Screen Added!';
 
             }
         }
+
 
         return response()->json($out);
     }
@@ -171,7 +175,7 @@ class UserRolesController extends Controller
 
             if (!empty($getId)){
 
-                $set = UserRoles::where('uuid', $getId)->first();
+                $set = Screens::where('uuid', $getId)->first();
                 if (!empty($set) && $set->status == 1){
                     $set->status = 0;
                 }else{

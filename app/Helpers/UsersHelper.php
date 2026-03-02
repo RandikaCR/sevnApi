@@ -22,9 +22,20 @@ class UsersHelper
 
         if (!empty($id) || !empty($userId)) {
 
-            $item = User::select('users.*', 'user_roles.user_role', 'businesses.business AS default_business')
+            $item = User::select(
+                'users.*',
+                'user_roles.user_role',
+                'user_roles.display_name AS user_role_display_name',
+                'user_roles.label AS user_role_label',
+                'user_titles.user_title',
+                'businesses.business AS default_business',
+                'designations.designation',
+            )
                 ->join('user_roles', 'users.user_role_id', 'user_roles.id')
+                ->join('user_businesses', 'users.default_business_id', 'user_businesses.id')
+                ->join('designations', 'user_businesses.designation_id', 'designations.id')
                 ->leftJoin('businesses', 'users.default_business_id', 'businesses.id')
+                ->leftJoin('user_titles', 'users.user_title_id', 'user_titles.id')
                 ->when(!empty($id), function ($query) use ($id) {
                     return $query->where('users.id', $id);
                 })

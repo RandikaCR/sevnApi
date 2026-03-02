@@ -4,14 +4,14 @@ namespace App\Http\Controllers\Services;
 
 use App\Helpers\CommonHelper;
 use App\Http\Controllers\Controller;
-use App\Models\UserRoles;
+use App\Models\Colors;
 use Illuminate\Http\Request;
 
-class UserRolesController extends Controller
+class ColorsController extends Controller
 {
-    private $screenPrefix = 'user_roles';
+    private $screenPrefix = 'colors';
 
-    public function getUserRoles(Request $request){
+    public function getColors(Request $request){
 
         $out = [];
 
@@ -31,22 +31,22 @@ class UserRolesController extends Controller
             $currentPage = !empty($request->current_page) ? $request->current_page : 0;
             $mode = !empty($request->mode) ? $request->mode : null;
 
-            $uuId = !empty($request->user_role_id) ? $request->user_role_id : 0;
+            $uuId = !empty($request->color_id) ? $request->color_id : 0;
 
-            $get = UserRoles::select('user_roles.*')
+            $get = Colors::select('colors.*')
                 ->when(!empty($uuId), function ($query) use ($uuId) {
                     return $query->where('uuid', $uuId);
                 }, function ($query) use ($request) {
                     $keyword = !empty($request->keyword) ? $request->keyword : '';
                     if (!empty($keyword)){
                         $query->where(function ($query) use ($keyword) {
-                            return $query->orWhere('user_role', 'like', '%'.$keyword.'%')
-                                ->orWhere('display_name', 'like', '%'.$keyword.'%');
+                            return $query->where('color', 'like', '%'.$keyword.'%')
+                                ->orWhere('color_code', 'like', '%'.$keyword.'%');
                         });
                     }
                     return $query;
                 })
-                ->orderBy('id', 'ASC');
+                ->orderBy('color', 'ASC');
 
             if (!empty($mode) && $mode == 'for_select'){
                 $out = $get->get();
@@ -58,7 +58,7 @@ class UserRolesController extends Controller
         return response()->json($out);
     }
 
-    public function getUserRole(Request $request){
+    public function getColor(Request $request){
         $out = [];
 
         $validate = [
@@ -73,9 +73,9 @@ class UserRolesController extends Controller
         $out['permissions'] = $permissions;
 
         if (empty($isInvalid )) {
-            $uuId = !empty($request->user_role_id) ? $request->user_role_id : 0;
+            $uuId = !empty($request->color_id) ? $request->color_id : 0;
 
-            $out = UserRoles::select('user_roles.*')
+            $out = Colors::select('colors.*')
                 ->when(!empty($uuId), function ($query) use ($uuId) {
                     return $query->where('uuid', $uuId);
                 })
@@ -85,7 +85,7 @@ class UserRolesController extends Controller
         return response()->json($out);
     }
 
-    public function setUserRole(Request $request){
+    public function setColor(Request $request){
         $out = [];
 
         $validate = [
@@ -101,34 +101,32 @@ class UserRolesController extends Controller
 
 
         if (empty($isInvalid)) {
-            $getId = !empty($request->user_role_id) ? $request->user_role_id : 0;
+            $getId = !empty($request->color_id) ? $request->color_id : 0;
 
             if (!empty($getId)){
                 $validated = $request->validate([
-                    'user_role' => 'required|unique:user_roles,user_role,'.$getId .',uuid',
-                    'display_name' => 'required',
+                    'color' => 'required|unique:colors,color,'.$getId .',uuid',
+                    'color_code' => 'required|unique:colors,color_code,'.$getId .',uuid',
                 ]);
 
-                $set = UserRoles::where('uuid', $getId)->first();
-                $set->user_role = $request->user_role;
-                $set->display_name = !empty($request->display_name) ? $request->display_name : null;
-                $set->label = !empty($request->label) ? $request->label : null;
+                $set = Colors::where('uuid', $getId)->first();
+                $set->color = $request->color;
+                $set->color_code = $request->color_code;
                 $set->save();
 
                 $out['status'] = 'success';
                 $out['message_title'] = 'Success!';
-                $out['message_text'] = 'Dealer has been Updated!';
+                $out['message_text'] = 'Color has been Updated!';
 
             }else{
                 $validated = $request->validate([
-                    'user_role' => 'required|unique:user_roles',
-                    'display_name' => 'required',
+                    'color' => 'required|unique:colors',
+                    'color_code' => 'required|unique:colors',
                 ]);
 
-                $set = new UserRoles();
-                $set->user_role = $request->user_role;
-                $set->display_name = !empty($request->display_name) ? $request->display_name : null;
-                $set->label = !empty($request->label) ? $request->label : null;
+                $set = new Colors();
+                $set->color = $request->color;
+                $set->color_code = $request->color_code;
                 $set->status = 1;
                 $set->save();
 
@@ -136,14 +134,14 @@ class UserRolesController extends Controller
                 $getCommon = new CommonHelper();
                 $uuId = $getCommon->generateUUId(['business_id' => 0, 'screen' => $this->screenPrefix, 'id' => $set->id]);
 
-                $update = UserRoles::find($set->id);
+                $update = Colors::find($set->id);
                 $update->uuid = $uuId;
                 $update->save();
 
 
                 $out['status'] = 'success';
                 $out['message_title'] = 'Success!';
-                $out['message_text'] = 'New Dealer Added!';
+                $out['message_text'] = 'New Color Added!';
 
             }
         }
@@ -171,7 +169,7 @@ class UserRolesController extends Controller
 
             if (!empty($getId)){
 
-                $set = UserRoles::where('uuid', $getId)->first();
+                $set = Colors::where('uuid', $getId)->first();
                 if (!empty($set) && $set->status == 1){
                     $set->status = 0;
                 }else{

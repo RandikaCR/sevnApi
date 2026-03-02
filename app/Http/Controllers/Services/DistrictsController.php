@@ -4,14 +4,15 @@ namespace App\Http\Controllers\Services;
 
 use App\Helpers\CommonHelper;
 use App\Http\Controllers\Controller;
-use App\Models\UserRoles;
+use App\Models\Businesses;
+use App\Models\Districts;
 use Illuminate\Http\Request;
 
-class UserRolesController extends Controller
+class DistrictsController extends Controller
 {
-    private $screenPrefix = 'user_roles';
+    private $screenPrefix = 'districts';
 
-    public function getUserRoles(Request $request){
+    public function getDistricts(Request $request){
 
         $out = [];
 
@@ -31,17 +32,16 @@ class UserRolesController extends Controller
             $currentPage = !empty($request->current_page) ? $request->current_page : 0;
             $mode = !empty($request->mode) ? $request->mode : null;
 
-            $uuId = !empty($request->user_role_id) ? $request->user_role_id : 0;
+            $uuId = !empty($request->disctrict_id) ? $request->disctrict_id : 0;
 
-            $get = UserRoles::select('user_roles.*')
+            $get = Districts::select('districts.*')
                 ->when(!empty($uuId), function ($query) use ($uuId) {
                     return $query->where('uuid', $uuId);
                 }, function ($query) use ($request) {
                     $keyword = !empty($request->keyword) ? $request->keyword : '';
                     if (!empty($keyword)){
                         $query->where(function ($query) use ($keyword) {
-                            return $query->orWhere('user_role', 'like', '%'.$keyword.'%')
-                                ->orWhere('display_name', 'like', '%'.$keyword.'%');
+                            return $query->where('district', 'like', '%'.$keyword.'%');
                         });
                     }
                     return $query;
@@ -58,7 +58,7 @@ class UserRolesController extends Controller
         return response()->json($out);
     }
 
-    public function getUserRole(Request $request){
+    public function getDistrict(Request $request){
         $out = [];
 
         $validate = [
@@ -73,19 +73,24 @@ class UserRolesController extends Controller
         $out['permissions'] = $permissions;
 
         if (empty($isInvalid )) {
-            $uuId = !empty($request->user_role_id) ? $request->user_role_id : 0;
+            $uuId = !empty($request->disctrict_id) ? $request->disctrict_id : 0;
 
-            $out = UserRoles::select('user_roles.*')
+            $out = Districts::select('districts.*')
                 ->when(!empty($uuId), function ($query) use ($uuId) {
                     return $query->where('uuid', $uuId);
                 })
+                /*->with([
+                    'business_branches' => function ($query) {
+                        return $query->select('business_branches.*')->where('business_branches.status', 1);
+                    }
+                ])*/
                 ->first();
         }
 
         return response()->json($out);
     }
 
-    public function setUserRole(Request $request){
+    public function setDistrict(Request $request){
         $out = [];
 
         $validate = [
@@ -101,34 +106,28 @@ class UserRolesController extends Controller
 
 
         if (empty($isInvalid)) {
-            $getId = !empty($request->user_role_id) ? $request->user_role_id : 0;
+            $getId = !empty($request->district_id) ? $request->district_id : 0;
 
             if (!empty($getId)){
                 $validated = $request->validate([
-                    'user_role' => 'required|unique:user_roles,user_role,'.$getId .',uuid',
-                    'display_name' => 'required',
+                    'district' => 'required|unique:districts,district,'.$getId .',uuid',
                 ]);
 
-                $set = UserRoles::where('uuid', $getId)->first();
-                $set->user_role = $request->user_role;
-                $set->display_name = !empty($request->display_name) ? $request->display_name : null;
-                $set->label = !empty($request->label) ? $request->label : null;
+                $set = Districts::where('uuid', $getId)->first();
+                $set->district = $request->district;
                 $set->save();
 
                 $out['status'] = 'success';
                 $out['message_title'] = 'Success!';
-                $out['message_text'] = 'Dealer has been Updated!';
+                $out['message_text'] = 'District has been Updated!';
 
             }else{
                 $validated = $request->validate([
-                    'user_role' => 'required|unique:user_roles',
-                    'display_name' => 'required',
+                    'district' => 'required|unique:districts',
                 ]);
 
-                $set = new UserRoles();
-                $set->user_role = $request->user_role;
-                $set->display_name = !empty($request->display_name) ? $request->display_name : null;
-                $set->label = !empty($request->label) ? $request->label : null;
+                $set = new Districts();
+                $set->district = $request->district;
                 $set->status = 1;
                 $set->save();
 
@@ -136,14 +135,14 @@ class UserRolesController extends Controller
                 $getCommon = new CommonHelper();
                 $uuId = $getCommon->generateUUId(['business_id' => 0, 'screen' => $this->screenPrefix, 'id' => $set->id]);
 
-                $update = UserRoles::find($set->id);
+                $update = Districts::find($set->id);
                 $update->uuid = $uuId;
                 $update->save();
 
 
                 $out['status'] = 'success';
                 $out['message_title'] = 'Success!';
-                $out['message_text'] = 'New Dealer Added!';
+                $out['message_text'] = 'New District Added!';
 
             }
         }
@@ -171,7 +170,7 @@ class UserRolesController extends Controller
 
             if (!empty($getId)){
 
-                $set = UserRoles::where('uuid', $getId)->first();
+                $set = Districts::where('uuid', $getId)->first();
                 if (!empty($set) && $set->status == 1){
                     $set->status = 0;
                 }else{

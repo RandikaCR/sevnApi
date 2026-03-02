@@ -4,14 +4,14 @@ namespace App\Http\Controllers\Services;
 
 use App\Helpers\CommonHelper;
 use App\Http\Controllers\Controller;
-use App\Models\UserRoles;
+use App\Models\Countries;
 use Illuminate\Http\Request;
 
-class UserRolesController extends Controller
+class CountriesController extends Controller
 {
-    private $screenPrefix = 'user_roles';
+    private $screenPrefix = 'countries';
 
-    public function getUserRoles(Request $request){
+    public function getCountries(Request $request){
 
         $out = [];
 
@@ -31,22 +31,23 @@ class UserRolesController extends Controller
             $currentPage = !empty($request->current_page) ? $request->current_page : 0;
             $mode = !empty($request->mode) ? $request->mode : null;
 
-            $uuId = !empty($request->user_role_id) ? $request->user_role_id : 0;
+            $uuId = !empty($request->country_id) ? $request->country_id : 0;
 
-            $get = UserRoles::select('user_roles.*')
+            $get = Countries::select('countries.*', 'country_regions.country_region')
+                ->join('country_regions', 'countries.country_region_id', 'country_regions.id')
                 ->when(!empty($uuId), function ($query) use ($uuId) {
-                    return $query->where('uuid', $uuId);
+                    return $query->where('countries.uuid', $uuId);
                 }, function ($query) use ($request) {
                     $keyword = !empty($request->keyword) ? $request->keyword : '';
                     if (!empty($keyword)){
                         $query->where(function ($query) use ($keyword) {
-                            return $query->orWhere('user_role', 'like', '%'.$keyword.'%')
-                                ->orWhere('display_name', 'like', '%'.$keyword.'%');
+                            return $query->orWhere('countries.country', 'like', '%'.$keyword.'%')
+                                ->orWhere('country_regions.country_region', 'like', '%'.$keyword.'%');
                         });
                     }
                     return $query;
                 })
-                ->orderBy('id', 'ASC');
+                ->orderBy('countries.country', 'ASC');
 
             if (!empty($mode) && $mode == 'for_select'){
                 $out = $get->get();
@@ -58,7 +59,7 @@ class UserRolesController extends Controller
         return response()->json($out);
     }
 
-    public function getUserRole(Request $request){
+    public function getCountry(Request $request){
         $out = [];
 
         $validate = [
@@ -73,11 +74,12 @@ class UserRolesController extends Controller
         $out['permissions'] = $permissions;
 
         if (empty($isInvalid )) {
-            $uuId = !empty($request->user_role_id) ? $request->user_role_id : 0;
+            $uuId = !empty($request->country_id) ? $request->country_id : 0;
 
-            $out = UserRoles::select('user_roles.*')
+            $out = Countries::select('countries.*', 'country_regions.country_region')
+                ->join('country_regions', 'countries.country_region_id', 'country_regions.id')
                 ->when(!empty($uuId), function ($query) use ($uuId) {
-                    return $query->where('uuid', $uuId);
+                    return $query->where('countries.uuid', $uuId);
                 })
                 ->first();
         }
@@ -85,7 +87,7 @@ class UserRolesController extends Controller
         return response()->json($out);
     }
 
-    public function setUserRole(Request $request){
+    public function setCountry(Request $request){
         $out = [];
 
         $validate = [
@@ -101,34 +103,42 @@ class UserRolesController extends Controller
 
 
         if (empty($isInvalid)) {
-            $getId = !empty($request->user_role_id) ? $request->user_role_id : 0;
+            $getId = !empty($request->country_id) ? $request->country_id : 0;
 
             if (!empty($getId)){
                 $validated = $request->validate([
-                    'user_role' => 'required|unique:user_roles,user_role,'.$getId .',uuid',
-                    'display_name' => 'required',
+                    'country_region_id' => 'required',
+                    'country' => 'required|unique:countries,country,'.$getId .',uuid',
+                    'iso_2' => 'required|unique:countries,iso_2,'.$getId .',uuid',
+                    'iso_3' => 'required|unique:countries,iso_3,'.$getId .',uuid',
                 ]);
 
-                $set = UserRoles::where('uuid', $getId)->first();
-                $set->user_role = $request->user_role;
-                $set->display_name = !empty($request->display_name) ? $request->display_name : null;
-                $set->label = !empty($request->label) ? $request->label : null;
+                $set = Countries::where('uuid', $getId)->first();
+                $set->country = $request->country;
+                $set->country_region_id = !empty($request->country_region_id) ? $request->country_region_id : 0;
+                $set->iso_2 = !empty($request->iso_2) ? $request->iso_2 : null;
+                $set->iso_3 = !empty($request->iso_3) ? $request->iso_3 : null;
+                $set->flag = !empty($request->flag) ? $request->flag : null;
                 $set->save();
 
                 $out['status'] = 'success';
                 $out['message_title'] = 'Success!';
-                $out['message_text'] = 'Dealer has been Updated!';
+                $out['message_text'] = 'Country has been Updated!';
 
             }else{
                 $validated = $request->validate([
-                    'user_role' => 'required|unique:user_roles',
-                    'display_name' => 'required',
+                    'country_region_id' => 'required',
+                    'country' => 'required|unique:countries',
+                    'iso_2' => 'required|unique:countries',
+                    'iso_3' => 'required|unique:countries',
                 ]);
 
-                $set = new UserRoles();
-                $set->user_role = $request->user_role;
-                $set->display_name = !empty($request->display_name) ? $request->display_name : null;
-                $set->label = !empty($request->label) ? $request->label : null;
+                $set = new Countries();
+                $set->country = $request->country;
+                $set->country_region_id = !empty($request->country_region_id) ? $request->country_region_id : 0;
+                $set->iso_2 = !empty($request->iso_2) ? $request->iso_2 : null;
+                $set->iso_3 = !empty($request->iso_3) ? $request->iso_3 : null;
+                $set->flag = !empty($request->flag) ? $request->flag : null;
                 $set->status = 1;
                 $set->save();
 
@@ -136,14 +146,14 @@ class UserRolesController extends Controller
                 $getCommon = new CommonHelper();
                 $uuId = $getCommon->generateUUId(['business_id' => 0, 'screen' => $this->screenPrefix, 'id' => $set->id]);
 
-                $update = UserRoles::find($set->id);
+                $update = Countries::find($set->id);
                 $update->uuid = $uuId;
                 $update->save();
 
 
                 $out['status'] = 'success';
                 $out['message_title'] = 'Success!';
-                $out['message_text'] = 'New Dealer Added!';
+                $out['message_text'] = 'New Country Added!';
 
             }
         }
@@ -171,7 +181,7 @@ class UserRolesController extends Controller
 
             if (!empty($getId)){
 
-                $set = UserRoles::where('uuid', $getId)->first();
+                $set = Countries::where('uuid', $getId)->first();
                 if (!empty($set) && $set->status == 1){
                     $set->status = 0;
                 }else{

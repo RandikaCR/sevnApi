@@ -17,9 +17,11 @@ class accountVerify extends Mailable
      * Create a new message instance.
      */
     private $mailSubject = null;
+    private $layout = null;
 
     public function __construct(private $data)
     {
+        $this->layout = !empty($data['layout']) ? $data['layout'] : 'sevn';
         $this->mailSubject = !empty($data['email_subject']) ? $data['email_subject'] : 'Test Mail';
     }
 
@@ -42,7 +44,7 @@ class accountVerify extends Mailable
     {
         return new Content(
             view: 'mails.account-verify',
-            with: ['data' => $this->data],
+            with: ['layout' => $this->layout, 'data' => $this->data],
         );
     }
 
