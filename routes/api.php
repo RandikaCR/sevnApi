@@ -31,6 +31,8 @@ use App\Http\Controllers\Services\OrderStatusesController;
 
 // P
 use App\Http\Controllers\Services\PaymentMethodsController;
+use App\Http\Controllers\Services\ProductCategoriesController;
+use App\Http\Controllers\Services\ProductRangesController;
 use App\Http\Controllers\Services\ProgressesController;
 
 // S
@@ -173,6 +175,13 @@ Route::middleware(['auth:sanctum', 'verified'])->group(function () {
         Route::post('/getPaymentMethod', [PaymentMethodsController::class, 'getPaymentMethod'])->name('paymentMethods.getPaymentMethod');
         Route::post('/setPaymentMethod', [PaymentMethodsController::class, 'setPaymentMethod'])->name('paymentMethods.setPaymentMethod');
         Route::post('/setStatus', [PaymentMethodsController::class, 'setStatus'])->name('paymentMethods.setStatus');
+    });
+
+    Route::prefix('ProductRanges')->group(function (){
+        Route::post('/getProductRanges', [ProductRangesController::class, 'getProductRanges'])->name('productRanges.getProductRanges');
+        Route::post('/getProductRange', [ProductRangesController::class, 'getProductRange'])->name('productRanges.getProductRange');
+        Route::post('/setProductRange', [ProductRangesController::class, 'setProductRange'])->name('productRanges.setProductRange');
+        Route::post('/setStatus', [ProductRangesController::class, 'setStatus'])->name('productRanges.setStatus');
     });
 
     Route::prefix('Progresses')->group(function (){
