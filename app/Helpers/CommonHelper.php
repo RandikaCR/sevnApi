@@ -208,7 +208,7 @@ class CommonHelper
     {
         $businessId = !empty($req['business_id']) ? $req['business_id'] : 1;
         $id = !empty($req['id']) ? $req['id'] : 0;
-        $uuId = !empty($req['category_id']) ? $req['category_id'] : 1;
+        $uuId = !empty($req['category_id']) ? $req['category_id'] : 0;
 
         $out = Categories::select('categories.*')
             ->when(!empty($id), function ($query) use ($id) {
